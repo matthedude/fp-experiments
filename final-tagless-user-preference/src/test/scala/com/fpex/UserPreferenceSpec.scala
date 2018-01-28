@@ -5,6 +5,8 @@ import org.scalacheck._
 import org.scalacheck.Prop._
 import shapeless.tag
 import shapeless.tag.@@
+import cats.instances.either._
+import TestDb._
 
 class UserPreferenceSpec extends Properties("UserPreference") with Generators {
 
@@ -13,7 +15,7 @@ class UserPreferenceSpec extends Properties("UserPreference") with Generators {
       implicit val userRepository =
         new RepositoryWithDatabaseInterpreter(TestDb(userProfile, List.empty))
 
-      UserPreference.sortProgrammes(userProfile.id, programmesToSort) == Right(programmesToSort)
+      UserPreference.sortProgrammes[EitherExec](userProfile.id, programmesToSort) == Right(programmesToSort)
   }
 
   property("returns the programmes in the same order if the user is unknown") = forAll {
@@ -24,7 +26,7 @@ class UserPreferenceSpec extends Properties("UserPreference") with Generators {
 
       val programmesToSort = programmes.map(_.programmeId)
 
-      UserPreference.sortProgrammes(userId, programmesToSort) == Right(programmesToSort)
+      UserPreference.sortProgrammes[EitherExec](userId, programmesToSort) == Right(programmesToSort)
   }
 
   property("sorting the programmes is idempotent") = forAll { (programmes: List[ProgrammeData]) =>
@@ -33,9 +35,10 @@ class UserPreferenceSpec extends Properties("UserPreference") with Generators {
       new RepositoryWithDatabaseInterpreter(TestDb(userProfile, programmes))
 
     val programmesToSort = programmes.map(_.programmeId)
-    val sortedProgrammes       = UserPreference.sortProgrammes(userProfile.id, programmesToSort).getOrElse(List.empty)
+    val sortedProgrammes =
+      UserPreference.sortProgrammes[EitherExec](userProfile.id, programmesToSort).getOrElse(List.empty)
 
-    UserPreference.sortProgrammes(userProfile.id, sortedProgrammes) == Right(sortedProgrammes)
+    UserPreference.sortProgrammes[EitherExec](userProfile.id, sortedProgrammes) == Right(sortedProgrammes)
   }
 
   property("programmes with no features in common with the user profile are always at the bottom of the list") =
@@ -59,7 +62,8 @@ class UserPreferenceSpec extends Properties("UserPreference") with Generators {
         new RepositoryWithDatabaseInterpreter(TestDb(userProfile, programmes))
 
       val programmesToSort = programmes.map(_.programmeId)
-      val sortedProgrammes = UserPreference.sortProgrammes(userProfile.id, programmesToSort).getOrElse(List.empty)
+      val sortedProgrammes =
+        UserPreference.sortProgrammes[EitherExec](userProfile.id, programmesToSort).getOrElse(List.empty)
 
       allBelowNoFeaturesInCommon(userProfile, sortedProgrammes)
     }

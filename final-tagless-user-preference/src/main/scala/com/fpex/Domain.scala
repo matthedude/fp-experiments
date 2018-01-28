@@ -5,15 +5,13 @@ import io.circe.generic.AutoDerivation
 import shapeless._
 import shapeless.tag.@@
 
-case class Feature(name: FeatureName, weight: Weight)
+final case class Feature(name: FeatureName, weight: Weight)
 
-case class UserProfile(id: UserId, features: List[Feature])
+final case class UserProfile(id: UserId, features: List[Feature])
 
-case class ProgrammeData(programmeId: ProgrammeId, features: List[Feature])
+final case class ProgrammeData(programmeId: ProgrammeId, features: List[Feature])
 
-case class AppError(message: String) extends Exception(message)
-
-case class ProgrammeScore(programmeId: ProgrammeId, score: Score)
+final case class ProgrammeScore(programmeId: ProgrammeId, score: Score)
 
 trait Decoders extends AutoDerivation {
 
