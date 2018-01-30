@@ -23,28 +23,20 @@ scalacOptions ++= Seq(
   "-Ypartial-unification"
 )
 
-val circeVersion = "0.9.0"
-
 libraryDependencies ++= Seq(
   "org.typelevel"  %% "cats-core"  % "1.0.1",
   "com.chuusai"    %% "shapeless"  % "2.3.3",
-  "org.scalacheck" %% "scalacheck" % "1.13.4" % Test
+  "org.scalacheck" %% "scalacheck" % "1.13.4" % Test,
+  "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test
 ) ++ Seq(
   "io.circe" %% "circe-core",
   "io.circe" %% "circe-generic",
   "io.circe" %% "circe-parser",
+  "io.circe" %% "circe-refined",
   "io.circe" %% "circe-optics"
-).map(_ % circeVersion)
+).map(_ % "0.9.0") ++ Seq(
+  "eu.timepit" %% "refined",
+  "eu.timepit" %% "refined-scalacheck"
+).map(_ % "0.8.4")
 
 resolvers += Resolver.sonatypeRepo("releases")
-
-// format: off
-testOptions in Test += Tests.Argument(
-  TestFrameworks.ScalaCheck,
-  "-maxSize", "10",
-  "-minSuccessfulTests", "100",
-  "-maxDiscardRatio", "10.0",
-  "-workers", "1",
-  "-verbosity", "1"
-)
-// format: on

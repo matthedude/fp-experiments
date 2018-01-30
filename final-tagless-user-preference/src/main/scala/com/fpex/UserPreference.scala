@@ -6,6 +6,9 @@ import cats.implicits._
 import io.circe._
 import io.circe.parser._
 import shapeless.tag
+import eu.timepit.refined._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.NonNegative
 
 object UserPreference {
 
@@ -40,13 +43,14 @@ object UserPreference {
       programmeData.map { pd =>
         val scoreProduct =
           for {
-            pdFeature          <- pd.features
-            userProfileFeature <- userProfile.features
+            pdFeature          <- pd.features.toList
+            userProfileFeature <- userProfile.features.toList
             if pdFeature.name == userProfileFeature.name
-          } yield (pdFeature.weight * userProfileFeature.weight)
-
-        ProgrammeScore(pd.programmeId, tag[ScoreTag][Float](scoreProduct.sum))
-      }.sortBy(-_.score).map(_.programmeId)
+          } yield (pdFeature.weight.value * userProfileFeature.weight.value)
+        ProgrammeScore(
+          pd.programmeId,
+          tag[ScoreTag][NonNegativeDouble]((refineV[NonNegative](scoreProduct.sum).toOption.get))) //sum of NonNegative always NonNegative
+      }.sortBy(-_.score.value).map(_.programmeId)
 
     val upF    = repo.userProfile(userId)
     val pdF    = programmesToSort.traverse(repo.programmeData)

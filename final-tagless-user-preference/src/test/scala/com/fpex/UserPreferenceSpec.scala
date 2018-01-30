@@ -2,13 +2,27 @@ package com.fpex
 
 import com.fpex.UserPreference.RepositoryWithDatabaseInterpreter
 import org.scalacheck._
+import org.scalacheck.Arbitrary._
 import org.scalacheck.Prop._
+import org.scalacheck.ScalacheckShapeless._
 import shapeless.tag
 import shapeless.tag.@@
+import eu.timepit.refined._
+import eu.timepit.refined.api.RefType
+import eu.timepit.refined.collection.NonEmpty
+import eu.timepit.refined.types.string._
+import eu.timepit.refined.scalacheck._
+import eu.timepit.refined.scalacheck.string._
+import eu.timepit.refined.scalacheck.numeric._
 import cats.instances.either._
+import cats.data.NonEmptyList
 import TestDb._
 
 class UserPreferenceSpec extends Properties("UserPreference") with Generators {
+
+  //without this UserProfile at :30 can't be found :-/
+  implicit val arbProgrammeDataList: Arbitrary[List[ProgrammeData]] = Arbitrary(
+    Gen.nonEmptyListOf(implicitly[Arbitrary[ProgrammeData]].arbitrary))
 
   property("returns the programmes in the same order if all the programmes are unknown") = forAll {
     (programmesToSort: List[ProgrammeId], userProfile: UserProfile) =>
@@ -19,83 +33,78 @@ class UserPreferenceSpec extends Properties("UserPreference") with Generators {
   }
 
   property("returns the programmes in the same order if the user is unknown") = forAll {
-    (programmes: List[ProgrammeData], userId: UserId) =>
+    (programmes: NonEmptyList[ProgrammeData], userId: UserId) =>
       implicit val userRepository =
         new RepositoryWithDatabaseInterpreter(
-          TestDb(Map.empty[UserId, UserProfile], programmes.map(p => p.programmeId -> p).toMap))
+          TestDb(Map.empty[UserId, UserProfile], programmes.toList.map(p => p.programmeId -> p).toMap))
 
-      val programmesToSort = programmes.map(_.programmeId)
+      val programmesToSort = programmes.map(_.programmeId).toList
 
       UserPreference.sortProgrammes[EitherExec](userId, programmesToSort) == Right(programmesToSort)
   }
 
-  property("sorting the programmes is idempotent") = forAll { (programmes: List[ProgrammeData]) =>
-    val userProfile = UserProfile(tag[UserIdTag][String]("userId"), programmes.take(5).flatMap(_.features))
+  property("sorting the programmes is idempotent") = forAll { (programmes: NonEmptyList[ProgrammeData]) =>
+    val userProfile = UserProfile(tag[UserIdTag][NonEmptyString](refineMV("userId")),
+                                  NonEmptyList.fromListUnsafe(programmes.toList.take(5).flatMap(_.features.toList)))
     implicit val userRepository =
-      new RepositoryWithDatabaseInterpreter(TestDb(userProfile, programmes))
+      new RepositoryWithDatabaseInterpreter(TestDb(userProfile, programmes.toList))
 
     val programmesToSort = programmes.map(_.programmeId)
     val sortedProgrammes =
-      UserPreference.sortProgrammes[EitherExec](userProfile.id, programmesToSort).getOrElse(List.empty)
+      UserPreference.sortProgrammes[EitherExec](userProfile.id, programmesToSort.toList).getOrElse(List.empty)
 
     UserPreference.sortProgrammes[EitherExec](userProfile.id, sortedProgrammes) == Right(sortedProgrammes)
   }
 
   property("programmes with no features in common with the user profile are always at the bottom of the list") =
-    forAll { (programmes: List[ProgrammeData]) =>
-      def allBelowNoFeaturesInCommon(userProfile: UserProfile,
-                                     left: List[ProgrammeId],
-                                     prevInCommon: Boolean = true): Boolean =
-        left match {
-          case Nil => true
-          case programmeId :: rest =>
-            val programme = programmes.find(_.programmeId == programmeId).get //test data always there
-            val notInCommon =
-              programme.features.map(_.name).toSet.intersect(userProfile.features.map(_.name).toSet).isEmpty
-            val allBelowNotInCommon = if (prevInCommon) true else notInCommon
-
-            allBelowNotInCommon && allBelowNoFeaturesInCommon(userProfile, rest, !notInCommon)
-        }
-
-      val userProfile = UserProfile(tag[UserIdTag][String]("userId"), programmes.take(5).flatMap(_.features))
+    forAll { (programmes: NonEmptyList[ProgrammeData]) =>
+      val userProfile = UserProfile(tag[UserIdTag][NonEmptyString](refineMV("userId")),
+                                    NonEmptyList.fromListUnsafe(programmes.toList.take(5).flatMap(_.features.toList)))
       implicit val userRepository =
-        new RepositoryWithDatabaseInterpreter(TestDb(userProfile, programmes))
+        new RepositoryWithDatabaseInterpreter(TestDb(userProfile, programmes.toList))
 
-      val programmesToSort = programmes.map(_.programmeId)
+      val programmesToSort = programmes.map(_.programmeId).toList
       val sortedProgrammes =
         UserPreference.sortProgrammes[EitherExec](userProfile.id, programmesToSort).getOrElse(List.empty)
 
-      allBelowNoFeaturesInCommon(userProfile, sortedProgrammes)
+      allBelowNoFeaturesInCommon(userProfile, sortedProgrammes, programmes.toList)
+    }
+
+  def allBelowNoFeaturesInCommon(userProfile: UserProfile,
+                                 left: List[ProgrammeId],
+                                 programmes: List[ProgrammeData],
+                                 prevInCommon: Boolean = true): Boolean =
+    left match {
+      case Nil => true
+      case programmeId :: rest =>
+        val programme = programmes.find(_.programmeId == programmeId).get //test data always there
+        val notInCommon =
+          programme.features
+            .map(_.name)
+            .toList
+            .toSet
+            .intersect(userProfile.features.map(_.name).toList.toSet)
+            .isEmpty
+        val allBelowNotInCommon = if (prevInCommon) true else notInCommon
+
+        allBelowNotInCommon && allBelowNoFeaturesInCommon(userProfile, rest, programmes, !notInCommon)
     }
 }
 
 trait Generators {
-  def genNonEmptyStringTag[T] = Gen.alphaStr.suchThat(!_.isEmpty).map(tag[T][String](_))
-  def genWeight               = Gen.choose(0.01f, 1f).map(tag[WeightTag][Float](_))
+  implicit def nonEmptyStringArbitrary[F[_, _], S <: String](
+      implicit rt: RefType[F],
+  ): Arbitrary[F[String, NonEmpty]] =
+    arbitraryRefType(Gen.nonEmptyListOf[Char](arbChar.arbitrary).map(_.mkString))
 
-  implicit def arbTag[T]: Arbitrary[String @@ T] = Arbitrary(genNonEmptyStringTag[T])
+  /* Didn't compile :(
+  implicit def arbTag[A, B, T, R[_, _]](implicit arb: Arbitrary[R[A, B]]): Arbitrary[R[A, B] @@ T] =
+    arbitraryRefType(arb.arbitrary)
+   */
 
-  val genFeature: Gen[Feature] =
-    for {
-      fn     <- genNonEmptyStringTag[FeatureNameTag]
-      weight <- genWeight
-    } yield Feature(fn, weight)
+  implicit def arbNoneEmptyStringTag[T](implicit arb: Arbitrary[NonEmptyString]): Arbitrary[NonEmptyString @@ T] =
+    arbitraryRefType(arb.arbitrary)
 
-  val genFeatures: Gen[List[Feature]] = Gen.listOfN(5, genFeature)
-
-  implicit val arbUserProfile: Arbitrary[UserProfile] = Arbitrary {
-    for {
-      userId   <- genNonEmptyStringTag[UserIdTag]
-      features <- genFeatures
-    } yield UserProfile(userId, features)
-  }
-
-  implicit val arbProgrammeDataList: Arbitrary[List[ProgrammeData]] = Arbitrary {
-    Gen.nonEmptyListOf {
-      for {
-        programmeId <- genNonEmptyStringTag[ProgrammeIdTag]
-        features    <- genFeatures
-      } yield ProgrammeData(programmeId, features)
-    }.map(pds => pds.map(pd => (pd.programmeId -> pd)).toMap.values.toList)
-  }
+  implicit def arbZeroToOneDoubleTag[T](implicit arb: Arbitrary[ZeroToOneDouble]): Arbitrary[ZeroToOneDouble @@ T] =
+    arbitraryRefType(arb.arbitrary)
 }
