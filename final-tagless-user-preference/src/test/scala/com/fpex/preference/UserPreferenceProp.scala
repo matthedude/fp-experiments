@@ -1,6 +1,6 @@
-package com.fpex
+package com.fpex.preference
 
-import com.fpex.UserPreference.RepositoryWithDatabaseInterpreter
+import com.fpex.preference.UserPreference.RepositoryWithDatabaseInterpreter
 import org.scalacheck._
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Prop._
@@ -16,9 +16,9 @@ import eu.timepit.refined.scalacheck.string._
 import eu.timepit.refined.scalacheck.numeric._
 import cats.instances.either._
 import cats.data.NonEmptyList
-import TestDb._
+import TestDatabaseAlg._
 
-class UserPreferenceSpec extends Properties("UserPreference") with Generators {
+class UserPreferenceProps extends Properties("UserPreference") with Generators {
 
   //without this UserProfile at :30 can't be found :-/
   implicit val arbProgrammeDataList: Arbitrary[List[ProgrammeData]] = Arbitrary(
@@ -27,7 +27,7 @@ class UserPreferenceSpec extends Properties("UserPreference") with Generators {
   property("returns the programmes in the same order if all the programmes are unknown") = forAll {
     (programmesToSort: List[ProgrammeId], userProfile: UserProfile) =>
       implicit val userRepository =
-        new RepositoryWithDatabaseInterpreter(TestDb(userProfile, List.empty))
+        new RepositoryWithDatabaseInterpreter(TestDatabaseAlg(userProfile, List.empty))
 
       UserPreference.sortProgrammes[EitherExec](userProfile.id, programmesToSort) == Right(programmesToSort)
   }
@@ -36,7 +36,7 @@ class UserPreferenceSpec extends Properties("UserPreference") with Generators {
     (programmes: NonEmptyList[ProgrammeData], userId: UserId) =>
       implicit val userRepository =
         new RepositoryWithDatabaseInterpreter(
-          TestDb(Map.empty[UserId, UserProfile], programmes.toList.map(p => p.programmeId -> p).toMap))
+          TestDatabaseAlg(Map.empty[UserId, UserProfile], programmes.toList.map(p => p.programmeId -> p).toMap))
 
       val programmesToSort = programmes.map(_.programmeId).toList
 
@@ -47,7 +47,7 @@ class UserPreferenceSpec extends Properties("UserPreference") with Generators {
     val userProfile = UserProfile(tag[UserIdTag][NonEmptyString](refineMV("userId")),
                                   NonEmptyList.fromListUnsafe(programmes.toList.take(5).flatMap(_.features.toList)))
     implicit val userRepository =
-      new RepositoryWithDatabaseInterpreter(TestDb(userProfile, programmes.toList))
+      new RepositoryWithDatabaseInterpreter(TestDatabaseAlg(userProfile, programmes.toList))
 
     val programmesToSort = programmes.map(_.programmeId)
     val sortedProgrammes =
@@ -61,7 +61,7 @@ class UserPreferenceSpec extends Properties("UserPreference") with Generators {
       val userProfile = UserProfile(tag[UserIdTag][NonEmptyString](refineMV("userId")),
                                     NonEmptyList.fromListUnsafe(programmes.toList.take(5).flatMap(_.features.toList)))
       implicit val userRepository =
-        new RepositoryWithDatabaseInterpreter(TestDb(userProfile, programmes.toList))
+        new RepositoryWithDatabaseInterpreter(TestDatabaseAlg(userProfile, programmes.toList))
 
       val programmesToSort = programmes.map(_.programmeId).toList
       val sortedProgrammes =

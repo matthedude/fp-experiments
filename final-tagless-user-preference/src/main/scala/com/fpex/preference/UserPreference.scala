@@ -1,14 +1,13 @@
-package com.fpex
+package com.fpex.preference
 
 import cats._
 import cats.data.OptionT
 import cats.implicits._
+import eu.timepit.refined._
+import eu.timepit.refined.numeric.NonNegative
 import io.circe._
 import io.circe.parser._
 import shapeless.tag
-import eu.timepit.refined._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.NonNegative
 
 object UserPreference {
 

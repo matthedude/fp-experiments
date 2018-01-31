@@ -1,10 +1,10 @@
-package com.fpex
+package com.fpex.preference
 
 import cats.data.NonEmptyList
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe._
-import io.circe.refined._
 import io.circe.generic.AutoDerivation
+import io.circe.refined._
 import shapeless._
 import shapeless.tag.@@
 

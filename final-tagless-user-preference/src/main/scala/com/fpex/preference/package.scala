@@ -1,13 +1,13 @@
-package com
+package com.fpex
 
-import shapeless.tag.@@
+import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.boolean._
-import eu.timepit.refined.types.string._
-import eu.timepit.refined._
 import eu.timepit.refined.numeric._
+import eu.timepit.refined.types.string._
+import shapeless.tag.@@
 
-package object fpex extends Decoders {
+package object preference extends Decoders {
 
   type ZeroToOneDouble   = Refined[Double, Greater[W.`0.0`.T] And Not[Greater[W.`1.0`.T]]]
   type PositiveDouble    = Double Refined Positive

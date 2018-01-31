@@ -1,15 +1,15 @@
-package com.fpex
+package com.fpex.preference
 
 import cats.implicits._
 import io.circe._
 import io.circe.syntax._
 import io.circe.refined._
-import UserPreference._
 import eu.timepit.refined.types.string.NonEmptyString
 import shapeless.tag.@@
-import TestDb._
+import UserPreference._
+import TestDatabaseAlg._
 
-case class TestDb(upDb: Map[UserId, UserProfile], pdDb: Map[ProgrammeId, ProgrammeData])
+case class TestDatabaseAlg(upDb: Map[UserId, UserProfile], pdDb: Map[ProgrammeId, ProgrammeData])
     extends DatabaseAlg[EitherExec] {
 
   val nonEmptyStringEncoder: Encoder[NonEmptyString] = refinedEncoder
@@ -32,9 +32,9 @@ case class TestDb(upDb: Map[UserId, UserProfile], pdDb: Map[ProgrammeId, Program
     pdDb.get(id).map(_.asJson.noSpaces).asRight[Error]
 }
 
-object TestDb {
+object TestDatabaseAlg {
   type EitherExec[A] = Either[Error, A]
 
-  def apply(userProfile: UserProfile, pdDb: List[ProgrammeData]): TestDb =
+  def apply(userProfile: UserProfile, pdDb: List[ProgrammeData]): TestDatabaseAlg =
     apply(Map(userProfile.id -> userProfile), pdDb.map(p => (p.programmeId, p)).toMap)
 }
