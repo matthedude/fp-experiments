@@ -67,32 +67,26 @@ class UserPreferenceProps extends Properties("UserPreference") with Generators {
       val sortedProgrammes =
         UserPreference.sortProgrammes[EitherExec](userProfile.id, programmesToSort).getOrElse(List.empty)
 
-      allBelowNoFeaturesInCommon(userProfile, sortedProgrammes, programmes.toList)
-    }
+      val featuresInCommon =
+        (s: Set[FeatureName]) => !s.intersect(userProfile.features.map(_.name).toList.toSet).isEmpty
 
-  def allBelowNoFeaturesInCommon(userProfile: UserProfile,
-                                 left: List[ProgrammeId],
-                                 programmes: List[ProgrammeData],
-                                 prevInCommon: Boolean = true): Boolean =
-    left match {
-      case Nil => true
-      case programmeId :: rest =>
-        val programme = programmes.find(_.programmeId == programmeId).get //test data always there
-        val notInCommon =
-          programme.features
+      val programmaData       = programmes.toList.map(p => (p.programmeId -> p)).toMap
+      val sortedProgrammeData = sortedProgrammes.map(programmaData)
+
+      val bottomOfList = sortedProgrammeData
+        .map(
+          _.features
             .map(_.name)
             .toList
-            .toSet
-            .intersect(userProfile.features.map(_.name).toList.toSet)
-            .isEmpty
-        val allBelowNotInCommon = if (prevInCommon) true else notInCommon
+            .toSet)
+        .dropWhile(featuresInCommon(_))
 
-        allBelowNotInCommon && allBelowNoFeaturesInCommon(userProfile, rest, programmes, !notInCommon)
+      !featuresInCommon(bottomOfList.toSet.flatten)
     }
 }
 
 trait Generators {
-  implicit def nonEmptyStringArbitrary[F[_, _], S <: String](
+  implicit def nonEmptyStringArbitrary[F[_, _]](
       implicit rt: RefType[F],
   ): Arbitrary[F[String, NonEmpty]] =
     arbitraryRefType(Gen.nonEmptyListOf[Char](arbChar.arbitrary).map(_.mkString))
